@@ -9,6 +9,12 @@ pub struct InitializeMint<'info> {
     pub mint: Account<'info, Mint>,
 }
 
+#[derive(Accounts)]
+pub struct InitializeTokenAccount<'info> {
+    #[account(zero)]
+    pub token_account: Account<'info, TokenAccount>,
+}
+
 #[program]
 pub mod basic_token_backend {
     use super::*;
@@ -25,6 +31,19 @@ pub mod basic_token_backend {
 
         Ok(())
     }
+
+    pub fn initialize_token_account(
+        ctx: Context<InitializeTokenAccount>,
+        authority: Pubkey,
+        mint: u64,
+    ) -> Result<()> {
+        let token_account = &mut ctx.accounts.token_account;
+
+        token_account.authority = authority;
+        token_account.mint = mint;
+
+        Ok(())
+    }
 }
 
 #[account]
@@ -32,4 +51,11 @@ pub struct Mint {
     pub mint_authority: Pubkey,
     pub supply: u64,
     pub decimals: u8,
+}
+
+#[account]
+pub struct TokenAccount {
+    pub authority: Pubkey,
+    pub balance: u64,
+    pub mint: u64,
 }

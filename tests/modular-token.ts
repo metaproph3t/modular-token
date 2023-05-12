@@ -17,39 +17,44 @@ describe("modular-token", () => {
     .BasicTokenBackend as Program<BasicTokenBackend>;
 
   it("Can initialize token accounts", async () => {
-    const tokenAccNeededSpc = new anchor.BN(8 + 8 + 8); // disc + balance + mint
-    const mintNeededSpc = new anchor.BN(8 + 8); // disc + mintAuthority + supply + decimals
+    const tokenAccountBytes = 8 + 32 + 8 + 8; // disc + authority + mint + balance
+    const mintBytes = 8 + 32 + 8 + 1; // disc + mintAuthority + supply + decimals
 
     const nonce = new anchor.BN(4);
 
-    const backendAcc = anchor.web3.Keypair.generate();
+    const [backendAcc, _] = anchor.web3.PublicKey.findProgramAddressSync(
+      [anchor.utils.bytes.utf8.encode("backend"), backend.programId.toBuffer()],
+      frontend.programId
+    );
+
+
     await frontend.methods
-      .registerBackend(8 + 8 + 8, 8 + 32 + 8 + 1)
+      .registerBackend(tokenAccountBytes, mintBytes)
       .accounts({
-        backend: backendAcc.publicKey,
+        backend: backendAcc,
         payer: frontend.provider.publicKey,
         systemProgram: anchor.web3.SystemProgram.programId,
         backendProgram: backend.programId,
       })
-      .signers([backendAcc])
       .rpc();
 
     const storedBackend = await frontend.account.backend.fetch(
-      backendAcc.publicKey
+      backendAcc
     );
 
     console.log(storedBackend);
 
-    const leBump = Buffer.from(nonce.toArray('le', 8));
+    // const leBump = Buffer.from(nonce.toArray('le', 8));
+    const nonceBytes = Buffer.from(nonce.toArray('le', 8))
 
     const [mint, bump] = anchor.web3.PublicKey.findProgramAddressSync(
-      [anchor.utils.bytes.utf8.encode("mint"), Buffer.from(nonce.toArray('le', 8))],
+      [anchor.utils.bytes.utf8.encode("mint"), nonceBytes],
       frontend.programId
     );
 
     console.log("mint: ", mint);
     console.log(bump);
-    console.log(leBump);
+    // console.log(leBump);
 
 
     const mintAuthority = anchor.web3.Keypair.generate();
@@ -64,7 +69,7 @@ describe("modular-token", () => {
     await frontend.methods
       .initializeMint(nonce, data)
       .accounts({
-        backend: backendAcc.publicKey,
+        backend: backendAcc,
         backendProgram: backend.programId,
         mint,
         payer: frontend.provider.publicKey,
@@ -84,6 +89,24 @@ describe("modular-token", () => {
 
     console.log(storedMint);
 
+    const [tokenAccount, tokenAccountBump] = anchor.web3.PublicKey.findProgramAddressSync(
+      [anchor.utils.bytes.utf8.encode("token"), nonceBytes, provider.publicKey.toBuffer()],
+      frontend.programId
+    );
+
+    await frontend.methods.initializeTokenAccount(provider.publicKey, nonce, Buffer.from([]))
+      .accounts({
+        backend: backendAcc,
+        backendProgram: backend.programId,
+        tokenAccount,
+        payer: provider.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .rpc();
+
+    const storedTokenAccount = await connection.getAccountInfoAndContext(tokenAccount);
+
+    console.log(storedTokenAccount);
 
     // const tokenAccountFrontKP = anchor.web3.Keypair.generate();
     // const mint = new anchor.BN(0);
