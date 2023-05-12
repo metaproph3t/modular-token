@@ -40,13 +40,17 @@ describe("modular-token", () => {
 
     console.log(storedBackend);
 
+    const leBump = Buffer.from(nonce.toArray('le', 8));
+
     const [mint, bump] = anchor.web3.PublicKey.findProgramAddressSync(
-      [anchor.utils.bytes.utf8.encode("mint")],
+      [anchor.utils.bytes.utf8.encode("mint"), Buffer.from(nonce.toArray('le', 8))],
       frontend.programId
     );
 
-    console.log(mint);
+    console.log("mint: ", mint);
     console.log(bump);
+    console.log(leBump);
+
 
     const mintAuthority = anchor.web3.Keypair.generate();
 

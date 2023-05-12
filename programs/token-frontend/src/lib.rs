@@ -24,7 +24,6 @@ pub struct RegisterBackend<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(nonce: u64)]
 pub struct InitializeMint<'info> {
     #[account(has_one = backend_program)]
     pub backend: Account<'info, Backend>,
@@ -62,18 +61,21 @@ pub mod token_frontend {
     pub fn initialize_mint(ctx: Context<InitializeMint>, nonce: u64, mint_data: Vec<u8>) -> Result<()> {
         let mint_account_bytes = ctx.accounts.backend.mint_account_needed_space;
 
+        let nonce = nonce.to_le_bytes();
+
         let (mint_address, bump_seed) =
-            Pubkey::find_program_address(&["mint".as_bytes()], ctx.program_id);
+            Pubkey::find_program_address(&["mint".as_bytes(), &nonce], ctx.program_id);
         if ctx.accounts.mint.key() != mint_address {
             msg!("INVALID SEEDS");
+            msg!("{:?}: {:?}", mint_address, bump_seed);
+            msg!("{:?}", nonce);
         }
 
         if *ctx.accounts.mint.owner != system_program::id() {
             msg!("INVALID OWNER");
         }
 
-        let nonce = nonce.to_le_bytes();
-        let mint_signer_seeds: &[&[_]] = &["mint".as_ref(), &[bump_seed]];
+        let mint_signer_seeds: &[&[_]] = &["mint".as_bytes(), &nonce, &[bump_seed]];
 
         let rent = Rent::get()?;
 
