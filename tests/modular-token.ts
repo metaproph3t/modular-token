@@ -13,16 +13,18 @@ describe("modular-token", () => {
   const connection = provider.connection;
 
   const frontend = anchor.workspace.TokenFrontend as Program<TokenFrontend>;
-  const backend = anchor.workspace.BasicTokenBackend as Program<BasicTokenBackend>;
+  const backend = anchor.workspace
+    .BasicTokenBackend as Program<BasicTokenBackend>;
 
   it("Can initialize token accounts", async () => {
-    const tokenAccNeededSpc = new anchor.BN(8+8+8); // disc + balance + mint
-    const mintNeededSpc = new anchor.BN(8+8); // disc + supply
+    const tokenAccNeededSpc = new anchor.BN(8 + 8 + 8); // disc + balance + mint
+    const mintNeededSpc = new anchor.BN(8 + 8); // disc + mintAuthority + supply + decimals
 
     const nonce = new anchor.BN(4);
 
     const backendAcc = anchor.web3.Keypair.generate();
-    await frontend.methods.initializeBackend(tokenAccNeededSpc, mintNeededSpc)
+    await frontend.methods
+      .registerBackend(8 + 8 + 8, 8 + 32 + 8 + 1)
       .accounts({
         backend: backendAcc.publicKey,
         payer: frontend.provider.publicKey,
@@ -31,20 +33,32 @@ describe("modular-token", () => {
       })
       .signers([backendAcc])
       .rpc();
-    
-    const storedBackend = await frontend.account.backend.fetch(backendAcc.publicKey);
+
+    const storedBackend = await frontend.account.backend.fetch(
+      backendAcc.publicKey
+    );
 
     console.log(storedBackend);
 
     const [mint, bump] = anchor.web3.PublicKey.findProgramAddressSync(
       [anchor.utils.bytes.utf8.encode("mint")],
-      frontend.programId,
+      frontend.programId
     );
 
     console.log(mint);
     console.log(bump);
 
-    await frontend.methods.initializeMint(nonce)
+    const mintAuthority = anchor.web3.Keypair.generate();
+
+    const data = backend.coder.instruction.encode("initialize_mint", {
+      mintAuthority: mintAuthority.publicKey,
+      decimals: 6,
+    }).slice(8); // slice off the first 8 bytes because they're already hardcoded inside the program
+
+    console.log(data);
+
+    await frontend.methods
+      .initializeMint(nonce, data)
       .accounts({
         backend: backendAcc.publicKey,
         backendProgram: backend.programId,
@@ -53,17 +67,19 @@ describe("modular-token", () => {
         systemProgram: anchor.web3.SystemProgram.programId,
       })
       .rpc();
-    
+
     const storedMint = await connection.getAccountInfoAndContext(mint);
-    const providerBal = await connection.getAccountInfoAndContext(frontend.provider.publicKey);
+    const providerBal = await connection.getAccountInfoAndContext(
+      frontend.provider.publicKey
+    );
 
     console.log(providerBal);
 
-
-    console.log('frontend program', frontend.programId);
-    console.log('backend program', backend.programId);
+    console.log("frontend program", frontend.programId);
+    console.log("backend program", backend.programId);
 
     console.log(storedMint);
+
 
     // const tokenAccountFrontKP = anchor.web3.Keypair.generate();
     // const mint = new anchor.BN(0);
@@ -92,7 +108,6 @@ describe("modular-token", () => {
     //   lamports: 100000,
     //   programId: backend.programId,
     // })
-
 
     // await program.methods
     //   .initializeTokenAccount(program.provider.publicKey, mint)

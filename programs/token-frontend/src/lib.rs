@@ -6,8 +6,7 @@ use solana_program::{
     program_error::ProgramError,
     pubkey::Pubkey,
     rent::Rent,
-    system_instruction,
-    system_program,
+    system_instruction, system_program,
 };
 
 declare_id!("HmbTLCmaGvZhKnn1Zfa1JVnp7vkMV4DYVxPLWBVoN65L");
@@ -42,6 +41,8 @@ pub struct InitializeMint<'info> {
 
 #[program]
 pub mod token_frontend {
+    use solana_program::instruction::Instruction;
+
     use super::*;
 
     pub fn register_backend(
@@ -58,18 +59,11 @@ pub mod token_frontend {
         Ok(())
     }
 
-    pub fn initialize_mint(
-        ctx: Context<InitializeMint>,
-        nonce: u64,
-    ) -> Result<()> {
+    pub fn initialize_mint(ctx: Context<InitializeMint>, nonce: u64, mint_data: Vec<u8>) -> Result<()> {
         let mint_account_bytes = ctx.accounts.backend.mint_account_needed_space;
 
-        let (mint_address, bump_seed) = Pubkey::find_program_address(
-            &[
-                "mint".as_bytes()
-            ],
-            ctx.program_id,
-        );
+        let (mint_address, bump_seed) =
+            Pubkey::find_program_address(&["mint".as_bytes()], ctx.program_id);
         if ctx.accounts.mint.key() != mint_address {
             msg!("INVALID SEEDS");
         }
@@ -79,18 +73,18 @@ pub mod token_frontend {
         }
 
         let nonce = nonce.to_le_bytes();
-        let mint_signer_seeds: &[&[_]] = &[
-            "mint".as_ref(),
-            &[bump_seed]
-        ];
+        let mint_signer_seeds: &[&[_]] = &["mint".as_ref(), &[bump_seed]];
 
         let rent = Rent::get()?;
 
+        // create a PDA that will be owned by the backend program, like what
+        // the associated token program does
         invoke_signed(
             &system_instruction::create_account(
                 ctx.accounts.payer.key,
                 ctx.accounts.mint.key,
-                rent.minimum_balance(mint_account_bytes.try_into().unwrap()).max(1),
+                rent.minimum_balance(mint_account_bytes.try_into().unwrap())
+                    .max(1),
                 mint_account_bytes as u64,
                 ctx.accounts.backend_program.key,
             ),
@@ -102,9 +96,33 @@ pub mod token_frontend {
             &[mint_signer_seeds],
         )?;
 
+        // we're packing the instruction manually here, but in production
+        // you would likely want to do something like this: https://github.com/solana-labs/solana-program-library/blob/68dbd449642b856ded8a674218ff9415b7e3091c/token/program/src/instruction.rs#L799
+        let mut initialize_mint_ix_data: Vec<u8> =
+            vec![0xd1, 0x2a, 0xc3, 0x04, 0x81, 0x55, 0xd1, 0x2c];
+        initialize_mint_ix_data.append(&mut mint_data.clone());
+
+        let initialize_mint_accounts = vec![
+            AccountMeta::new(mint_address, false)
+        ];
+
+        let mint_ix = Instruction {
+            program_id: ctx.accounts.backend_program.key(),
+            accounts: initialize_mint_accounts,
+            data: initialize_mint_ix_data,
+        };
+
+        invoke(
+            &mint_ix, 
+            &[
+                ctx.accounts.backend_program.to_account_info(),
+                ctx.accounts.mint.to_account_info(),
+            ]
+        )?;
+
         Ok(())
     }
-} 
+}
 
 #[account]
 pub struct Backend {
