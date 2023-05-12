@@ -1,12 +1,12 @@
 [package]
-name = "modular-token"
+name = "token-frontend"
 version = "0.1.0"
 description = "Created with Anchor"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "modular_token"
+name = "token_frontend"
 
 [features]
 no-entrypoint = []
@@ -17,3 +17,4 @@ default = []
 
 [dependencies]
 anchor-lang = "0.27.0"
+solana-program = "1.15.2"

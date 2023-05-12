@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use modular_token::TokenAccountFront;
+// use modular_token::TokenAccountFront;
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
@@ -16,20 +16,17 @@ pub struct InitializeMint<'info> {
 #[instruction(mint: u64)]
 pub struct InitializeTokenAccount<'info> {
     pub token_account_back: Account<'info, TokenAccountBack>,
-    pub token_account_front: Account<'info, TokenAccountFront>,
+    // pub token_account_front: Account<'info, TokenAccountFront>,
     #[account(mut)]
     pub payer: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
 
-
 #[program]
 pub mod basic_token_backend {
     use super::*;
 
-    pub fn initialize_token_account(
-        _ctx: Context<InitializeTokenAccount>,
-    ) -> Result<()> {
+    pub fn initialize_token_account(_ctx: Context<InitializeTokenAccount>) -> Result<()> {
         Ok(())
     }
 
