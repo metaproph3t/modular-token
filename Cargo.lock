@@ -297,6 +297,7 @@ name = "basic-token-backend"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
+ "modular-token",
 ]
 
 [[package]]
