@@ -12,24 +12,24 @@ use solana_program::{
 declare_id!("HmbTLCmaGvZhKnn1Zfa1JVnp7vkMV4DYVxPLWBVoN65L");
 
 #[derive(Accounts)]
-pub struct RegisterBackend<'info> {
-    #[account(init, payer = payer, space = 8 + 32 + 4 + 4, seeds = ["backend".as_ref(), backend_program.key().as_ref()], bump)]
-    pub backend: Account<'info, Backend>,
+pub struct RegisterHandler<'info> {
+    #[account(init, payer = payer, space = 8 + 32 + 4 + 4, seeds = ["token_handler".as_ref(), handler_program.key().as_ref()], bump)]
+    pub handler: Account<'info, TokenHandler>,
     #[account(mut)]
     pub payer: Signer<'info>,
     pub system_program: Program<'info, System>,
     /// CHECK: not reading this, just need to be executable
     #[account(executable)]
-    pub backend_program: UncheckedAccount<'info>,
+    pub handler_program: UncheckedAccount<'info>,
 }
 
 #[derive(Accounts)]
 pub struct InitializeMint<'info> {
-    #[account(has_one = backend_program)]
-    pub backend: Account<'info, Backend>,
+    #[account(has_one = handler_program)]
+    pub handler: Account<'info, TokenHandler>,
     /// CHECK: not reading this, just need to be executable
     #[account(executable)]
-    pub backend_program: UncheckedAccount<'info>,
+    pub handler_program: UncheckedAccount<'info>,
     /// CHECK: not reading this, just passing along to backend
     #[account(mut)]
     pub mint: UncheckedAccount<'info>,
@@ -40,11 +40,11 @@ pub struct InitializeMint<'info> {
 
 #[derive(Accounts)]
 pub struct InitializeTokenAccount<'info> {
-    #[account(has_one = backend_program)]
-    pub backend: Account<'info, Backend>,
+    #[account(has_one = handler_program)]
+    pub handler: Account<'info, TokenHandler>,
     /// CHECK: not reading this, just need to be executable
     #[account(executable)]
-    pub backend_program: UncheckedAccount<'info>,
+    pub handler_program: UncheckedAccount<'info>,
     /// CHECK: not reading this, just passing along to backend
     #[account(mut)]
     pub token_account: UncheckedAccount<'info>,
@@ -55,11 +55,11 @@ pub struct InitializeTokenAccount<'info> {
 
 #[derive(Accounts)]
 pub struct Transfer<'info> {
-    #[account(has_one = backend_program)]
-    pub backend: Account<'info, Backend>,
+    #[account(has_one = handler_program)]
+    pub handler: Account<'info, TokenHandler>,
     /// CHECK: not reading it
     #[account(executable)]
-    pub backend_program: UncheckedAccount<'info>,
+    pub handler_program: UncheckedAccount<'info>,
     /// CHECK: passing along to backend_program
     #[account(mut)]
     pub from: UncheckedAccount<'info>,
@@ -70,19 +70,19 @@ pub struct Transfer<'info> {
 }
 
 #[program]
-pub mod token_frontend {
+pub mod token {
     use solana_program::instruction::Instruction;
 
     use super::*;
 
-    pub fn register_backend(
-        ctx: Context<RegisterBackend>,
+    pub fn register_handler(
+        ctx: Context<RegisterHandler>,
         token_account_bytes: u32,
         mint_account_bytes: u32,
     ) -> Result<()> {
-        let backend = &mut ctx.accounts.backend;
+        let backend = &mut ctx.accounts.handler;
 
-        backend.backend_program = ctx.accounts.backend_program.key();
+        backend.handler_program = ctx.accounts.handler_program.key();
         backend.token_account_bytes = token_account_bytes;
         backend.mint_account_bytes = mint_account_bytes;
 
@@ -94,7 +94,7 @@ pub mod token_frontend {
         nonce: u64,
         mint_data: Vec<u8>,
     ) -> Result<()> {
-        let mint_account_bytes = ctx.accounts.backend.mint_account_bytes;
+        let mint_account_bytes = ctx.accounts.handler.mint_account_bytes;
 
         let nonce = nonce.to_le_bytes();
 
@@ -123,7 +123,7 @@ pub mod token_frontend {
                 rent.minimum_balance(mint_account_bytes.try_into().unwrap())
                     .max(1),
                 mint_account_bytes as u64,
-                ctx.accounts.backend_program.key,
+                ctx.accounts.handler_program.key,
             ),
             &[
                 ctx.accounts.payer.to_account_info(),
@@ -142,7 +142,7 @@ pub mod token_frontend {
         let initialize_mint_accounts = vec![AccountMeta::new(mint_address, false)];
 
         let mint_ix = Instruction {
-            program_id: ctx.accounts.backend_program.key(),
+            program_id: ctx.accounts.handler_program.key(),
             accounts: initialize_mint_accounts,
             data: initialize_mint_ix_data,
         };
@@ -150,7 +150,7 @@ pub mod token_frontend {
         invoke(
             &mint_ix,
             &[
-                ctx.accounts.backend_program.to_account_info(),
+                ctx.accounts.handler_program.to_account_info(),
                 ctx.accounts.mint.to_account_info(),
             ],
         )?;
@@ -166,7 +166,7 @@ pub mod token_frontend {
         mint_nonce: u64,
         token_account_data: Vec<u8>,
     ) -> Result<()> {
-        let token_account_bytes = ctx.accounts.backend.token_account_bytes;
+        let token_account_bytes = ctx.accounts.handler.token_account_bytes;
 
         let (token_account_address, bump_seed) = Pubkey::find_program_address(
             &[
@@ -203,7 +203,7 @@ pub mod token_frontend {
                 rent.minimum_balance(token_account_bytes.try_into().unwrap())
                     .max(1),
                 token_account_bytes as u64,
-                ctx.accounts.backend_program.key,
+                ctx.accounts.handler_program.key,
             ),
             &[
                 ctx.accounts.payer.to_account_info(),
@@ -225,7 +225,7 @@ pub mod token_frontend {
             vec![AccountMeta::new(token_account_address, false)];
 
         let token_account_ix = Instruction {
-            program_id: ctx.accounts.backend_program.key(),
+            program_id: ctx.accounts.handler_program.key(),
             accounts: initialize_token_account_accounts,
             data: initialize_token_account_ix_data,
         };
@@ -233,7 +233,7 @@ pub mod token_frontend {
         invoke(
             &token_account_ix,
             &[
-                ctx.accounts.backend_program.to_account_info(),
+                ctx.accounts.handler_program.to_account_info(),
                 ctx.accounts.token_account.to_account_info(),
             ],
         )?;
@@ -244,15 +244,14 @@ pub mod token_frontend {
     pub fn transfer(
         ctx: Context<Transfer>,
         amount: u64,
-        transfer_data: Vec<u8>,
     ) -> Result<()> {
         Ok(())
     }
 }
 
 #[account]
-pub struct Backend {
-    pub backend_program: Pubkey,
+pub struct TokenHandler {
+    pub handler_program: Pubkey,
     pub token_account_bytes: u32,
     pub mint_account_bytes: u32,
 }

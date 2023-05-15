@@ -1,12 +1,12 @@
 [package]
-name = "basic-token-backend"
+name = "basic-token-handler"
 version = "0.1.0"
 description = "Created with Anchor"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "basic_token_backend"
+name = "basic_token_handler"
 
 [features]
 no-entrypoint = []
@@ -17,4 +17,4 @@ default = []
 
 [dependencies]
 anchor-lang = "0.27.0"
-token-frontend = { path = "../token-frontend", features = ["cpi"] }
+token = { path = "../token", features = ["cpi"] }

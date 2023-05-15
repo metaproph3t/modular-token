@@ -16,7 +16,7 @@ pub struct InitializeTokenAccount<'info> {
 }
 
 #[program]
-pub mod basic_token_backend {
+pub mod basic_token_handler {
     use super::*;
 
     pub fn initialize_mint(
