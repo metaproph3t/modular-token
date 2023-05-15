@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
-// use modular_token::TokenAccountFront;
+use token::TokenHandler;
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("EDR4Ycrv7rsw3B4X9e5wLmxS7g7ULbFyoY9AeCJ5ZBSn");
 
 #[derive(Accounts)]
 pub struct InitializeMint<'info> {
@@ -13,6 +13,17 @@ pub struct InitializeMint<'info> {
 pub struct InitializeTokenAccount<'info> {
     #[account(zero)]
     pub token_account: Account<'info, TokenAccount>,
+}
+
+#[derive(Accounts)]
+pub struct MintTo<'info> {
+    #[account(mut)]
+    pub mint: Account<'info, Mint>,
+    #[account(mut)]
+    pub to: Account<'info, TokenAccount>,
+    // checks that it is owned by the token program
+    #[account(signer)]
+    pub signer: Account<'info, TokenHandler>, 
 }
 
 #[program]
@@ -44,6 +55,19 @@ pub mod basic_token_handler {
 
         Ok(())
     }
+
+    pub fn mint_to(
+        ctx: Context<MintTo>,
+        amount: u64,
+    ) -> Result<()> {
+        let mint = &mut ctx.accounts.mint;
+        let to = &mut ctx.accounts.to;
+
+        to.balance += amount;
+        mint.supply += amount;
+
+        Ok(())
+    }
 }
 
 #[account]
@@ -56,6 +80,6 @@ pub struct Mint {
 #[account]
 pub struct TokenAccount {
     pub authority: Pubkey,
-    pub balance: u64,
     pub mint: u64,
+    pub balance: u64,
 }

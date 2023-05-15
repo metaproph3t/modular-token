@@ -3,7 +3,7 @@ seeds = false
 skip-lint = false
 [programs.localnet]
 token = "HmbTLCmaGvZhKnn1Zfa1JVnp7vkMV4DYVxPLWBVoN65L"
-basic_token_handler = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+basic_token_handler = "EDR4Ycrv7rsw3B4X9e5wLmxS7g7ULbFyoY9AeCJ5ZBSn"
 
 [registry]
 url = "https://api.apr.dev"
