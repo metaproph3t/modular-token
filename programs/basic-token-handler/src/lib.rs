@@ -26,6 +26,16 @@ pub struct MintTo<'info> {
     pub signer: Account<'info, TokenHandler>, 
 }
 
+#[derive(Accounts)]
+pub struct Transfer<'info> {
+    #[account(mut)]
+    pub from: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub to: Account<'info, TokenAccount>,
+    #[account(signer)]
+    pub signer: Account<'info, TokenHandler>,
+}
+
 #[program]
 pub mod basic_token_handler {
     use super::*;
@@ -65,6 +75,22 @@ pub mod basic_token_handler {
 
         to.balance += amount;
         mint.supply += amount;
+
+        Ok(())
+    }
+
+    pub fn transfer(
+        ctx: Context<Transfer>,
+        amount: u64,
+    ) -> Result<()> {
+        let from = &mut ctx.accounts.from;
+        let to = &mut ctx.accounts.to;
+
+        assert!(from.balance >= amount);
+        assert!(from.mint == to.mint);
+
+        from.balance -= amount;
+        to.balance += amount;
 
         Ok(())
     }

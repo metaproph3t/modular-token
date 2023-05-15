@@ -29,13 +29,19 @@
 //! account. The result of these two actions is that users and other
 //! programs can be certain that their signed accounts aren't being
 //! passed to untrusted code.
+//! 
+//! In the current design, users would still need to call the handler
+//! directly for custom features (e.g., the freeze authority would
+//! need to call the handler directly to freeze), but we could likely
+//! come up with a mechanism to solve this, such as handlers laying
+//! out all of the 'authorities' next to each other in the mint 
+//! accounts, and this program having an abstract `check_authority`
+//! function that tells the handler which authority was checked.
 
 use anchor_lang::prelude::*;
 use solana_program::{
     account_info::AccountInfo,
-    entrypoint::ProgramResult,
-    program::{get_return_data, invoke, invoke_signed},
-    program_error::ProgramError,
+    program::{invoke, invoke_signed},
     pubkey::Pubkey,
     rent::Rent,
     system_instruction, system_program,
@@ -302,7 +308,7 @@ pub mod token {
 
         let mint_nonce_bytes: [u8; 8] = ctx.accounts.to.data.borrow()[40..48].try_into().unwrap();
 
-        let (mint_address, bump_seed) =
+        let (mint_address, _) =
             Pubkey::find_program_address(&[b"mint", &mint_nonce_bytes], ctx.program_id);
         
         assert!(ctx.accounts.mint.key() == mint_address); 
@@ -349,48 +355,57 @@ pub mod token {
         Ok(())
     }
 
-    // pub fn transfer(
-    //     ctx: Context<Transfer>,
-    //     amount: u64,
-    // ) -> Result<()> {
-    //     // Perhaps these checks are unnecessary since a non-owning
-    //     // program wouldn't be able to mutate the state anyway
-    //     assert!(ctx.accounts.from.owner == ctx.accounts.handler_program.key);
-    //     assert!(ctx.accounts.to.owner == ctx.accounts.handler_program.key);
+    pub fn transfer(
+        ctx: Context<Transfer>,
+        amount: u64,
+    ) -> Result<()> {
+        let handler_program = ctx.accounts.handler_program.key();
+        // Perhaps these checks are unnecessary since a non-owning
+        // program wouldn't be able to mutate the state anyway
+        assert!(ctx.accounts.from.owner == &handler_program);
+        assert!(ctx.accounts.to.owner == &handler_program);
 
-    //     // Since we can't pass the signer to an untrusted program, we
-    //     // need to check that from's authority has signed here and then
-    //     // indicate this to the handler.
-    //     // 
-    //     // This is handled in the following way:
-    //     // - token handlers must store the authority of a token account
-    //     //   in bytes 8..39
-    //     // - we make the check here, and if it looks good, we pass
-    //     //   along a signed version of the `TokenHandler` account.
-    //     // - handler can infer that the authority has signed from the
-    //     //   presence of the signed `TokenHandler account.
-    //     //
-    //     // This is secure because the `TokenHandler` account shouldn't
-    //     // have any resources to steal or grief.
+        let from_authority_bytes: [u8; 32] = ctx.accounts.from.data.borrow()[8..40].try_into().unwrap();
+        let from_authority: Pubkey = from_authority_bytes.into();
 
-    //     let from_authority_bytes: [u8; 32] = ctx.accounts.from.data.borrow()[8..40].try_into().unwrap();
-    //     let from_authority: Pubkey = from_authority_bytes.into();
+        assert!(from_authority == ctx.accounts.authority.key());
 
-    //     assert!(from_authority == ctx.accounts.authority.key());
+        let handler_signer_seeds: &[&[_]] = &[
+            b"handler",
+            handler_program.as_ref(),
+            &[ctx.accounts.handler.pda_bump],
+        ];
 
-    //     let token_handler_signer_seeds: &[&[_]] = &[
-    //         "token_handler".as_bytes(),
-    //         &ctx.accounts.handler_program.key().to_bytes(),
-    //         &[ctx.accounts.handler.pda_bump],
-    //     ];
+        let mut transfer_ix_data: Vec<u8> =
+            vec![0xa3, 0x34, 0xc8, 0xe7, 0x8c, 0x03, 0x45, 0xba];
+        transfer_ix_data.extend_from_slice(&amount.to_le_bytes());
 
-    //     let mut transfer_ix_data: Vec<u8> =
-    //         vec![0x96, 0x55, 0x2c, 0x1c, 0x95, 0x0e, 0xd2, 0x1a];
-    //     // initialize_token_account_ix_data.extend_from_slice(&authority.to_bytes());
-    //     // initialize_token_account_ix_data.extend_from_slice(&mint_nonce.to_le_bytes());
-    //     // initialize_token_account_ix_data.append(&mut token_account_data.clone());
-    //     Ok(())
-    // }
+        let transfer_accounts =
+            vec![
+                AccountMeta::new(ctx.accounts.from.key(), false),
+                AccountMeta::new(ctx.accounts.to.key(), false),
+                AccountMeta::new_readonly(ctx.accounts.handler.key(), true),
+            ];
+        
+        let transfer_ix = Instruction {
+            program_id: ctx.accounts.handler_program.key(),
+            accounts: transfer_accounts,
+            data: transfer_ix_data,
+        };
+
+        invoke_signed(
+            &transfer_ix,
+            &[
+                ctx.accounts.handler_program.to_account_info(),
+                ctx.accounts.from.to_account_info(),
+                ctx.accounts.to.to_account_info(),
+                ctx.accounts.handler.to_account_info(),
+            ],
+            &[handler_signer_seeds]
+        )?;
+
+        Ok(())
+    }
 }
 
 #[account]
